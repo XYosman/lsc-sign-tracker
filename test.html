@@ -100,33 +100,6 @@
       font-size: 0.9rem;
       margin-top: 4px;
     }
-    .signs-grid {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 8px;
-      max-width: 500px;
-      margin-top: 8px;
-    }
-    .sign-btn {
-      background: #16213e;
-      border: 1px solid #0f3460;
-      color: #e0e0e0;
-      padding: 8px;
-      border-radius: 6px;
-      cursor: pointer;
-      font-size: 0.8rem;
-      font-weight: 400;
-      text-align: center;
-    }
-    .sign-btn:hover {
-      border-color: #4fc3f7;
-      background: #1a2a4a;
-    }
-    .status {
-      margin-top: 12px;
-      font-size: 0.85rem;
-      color: #888;
-    }
     .hand-indicator {
       display: flex;
       gap: 16px;
@@ -177,11 +150,6 @@
     Presiona Iniciar y muestra tus manos
   </div>
 
-  <div class="panel" style="margin-top: 20px; max-width: 600px; width: 100%;">
-    <h3>Reproducir senas</h3>
-    <div class="signs-grid" id="signs-grid"></div>
-  </div>
-
   <script type="importmap">
   {
     "imports": {
@@ -202,7 +170,6 @@
     const btnStop = document.getElementById("btn-stop");
     const dotLeft = document.getElementById("dot-left");
     const dotRight = document.getElementById("dot-right");
-    const signsGrid = document.getElementById("signs-grid");
 
     let camera = null;
     let scene3d = null;
@@ -212,18 +179,6 @@
 
     for (const sign of LSC_SIGNS) {
       library.registerSign(sign);
-
-      const btn = document.createElement("button");
-      btn.className = "sign-btn";
-      btn.textContent = sign.name;
-      btn.onclick = () => {
-        player.play(sign, true);
-        resultEl.innerHTML = `
-          <div class="label">${sign.name}</div>
-          <div class="confidence">${sign.description}</div>
-        `;
-      };
-      signsGrid.appendChild(btn);
     }
 
     player.onFrame((left, right) => {

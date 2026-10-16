@@ -53,9 +53,23 @@ export class HandModel3D {
   update(landmarks: Landmark[]): void {
     if (landmarks.length < 21) return;
 
+    let cx = 0, cy = 0, cz = 0;
+    for (const lm of landmarks) {
+      cx += lm.x; cy += lm.y; cz += lm.z;
+    }
+    cx /= landmarks.length;
+    cy /= landmarks.length;
+    cz /= landmarks.length;
+
+    const scale = 0.3;
+
     for (let i = 0; i < 21; i++) {
       const lm = landmarks[i];
-      this.jointPositions[i].set(lm.x, -lm.y, -lm.z);
+      this.jointPositions[i].set(
+        (lm.x - cx) * scale,
+        -(lm.y - cy) * scale,
+        -(lm.z - cz) * scale
+      );
       this.joints[i].position.copy(this.jointPositions[i]);
     }
 
