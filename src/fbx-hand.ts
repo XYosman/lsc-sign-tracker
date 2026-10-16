@@ -4,6 +4,7 @@ import type { Landmark } from "./camera.js";
 
 export interface FBXHandOptions {
   modelUrl: string;
+  texturePath?: string;
   width?: number;
   height?: number;
   background?: number;
@@ -42,20 +43,33 @@ export class FBXHandScene {
   model: THREE.Group | null = null;
   bones: THREE.Bone[] = [];
   boneMap: Map<string, THREE.Bone> = new Map();
-  private opts: Required<FBXHandOptions>;
-  private loader = new FBXLoader();
+  private opts: Required<Omit<FBXHandOptions, "texturePath">> & { texturePath: string };
+  private loader: FBXLoader;
   private loaded = false;
   private onLoadedCallback: (() => void) | null = null;
 
   constructor(container: HTMLElement, options: FBXHandOptions) {
     this.opts = {
       modelUrl: options.modelUrl,
+      texturePath: options.texturePath ?? new URL("./textures/", options.modelUrl).href,
       width: options.width ?? container.clientWidth ?? 400,
       height: options.height ?? container.clientHeight ?? 300,
       background: options.background ?? 0x1a1a2e,
       cameraZ: options.cameraZ ?? 2,
       modelScale: options.modelScale ?? 0.01
     };
+
+    const manager = new THREE.LoadingManager();
+    const texBase = this.opts.texturePath.replace(/\/$/, "");
+    manager.setURLModifier((url) => {
+      if (/\.(jpg|jpeg|png|bmp|tga|webp)$/i.test(url)) {
+        const file = url.split("/").pop()!.split("\\").pop()!;
+        return `${texBase}/${file}`;
+      }
+      return url;
+    });
+
+    this.loader = new FBXLoader(manager);
 
     container.style.overflow = "hidden";
     container.style.width = this.opts.width + "px";
