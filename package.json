@@ -1,0 +1,43 @@
+{
+  "name": "@lsc/sign-tracker",
+  "version": "0.1.0",
+  "description": "Rastreo de manos, rostro y cuerpo con visualización 3D para Lengua de Señas Colombiana (LSC)",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": [
+    "dist",
+    "models",
+    "src"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "lsc",
+    "sign-language",
+    "colombian-sign-language",
+    "mediapipe",
+    "hand-tracking",
+    "three.js",
+    "pose-detection"
+  ],
+  "author": "XYosman",
+  "license": "MIT",
+  "dependencies": {
+    "@mediapipe/tasks-vision": "^0.10.14",
+    "three": "^0.169.0"
+  },
+  "devDependencies": {
+    "@types/three": "^0.169.0",
+    "typescript": "^5.6.0"
+  }
+}
