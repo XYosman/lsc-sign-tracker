@@ -154,13 +154,14 @@
   {
     "imports": {
       "three": "./node_modules/three/build/three.module.js",
+      "three/examples/jsm/": "./node_modules/three/examples/jsm/",
       "@mediapipe/tasks-vision": "./node_modules/@mediapipe/tasks-vision/vision_bundle.mjs"
     }
   }
   </script>
 
   <script type="module">
-    import { LSCCamera, HandScene, HandOverlay, LSCSignLibrary, SignPlayer, LSC_SIGNS } from "./dist/index.js?v=3";
+    import { LSCCamera, HandOverlay, FBXHandScene, LSCSignLibrary, SignPlayer, LSC_SIGNS } from "./dist/index.js?v=4";
 
     const video = document.getElementById("video");
     const container = document.getElementById("canvas-container");
@@ -207,7 +208,17 @@
         await video.play();
 
         if (!scene3d) {
-          scene3d = new HandScene(container, { width: 400, height: 300, cameraZ: 1.5, clip: true });
+          scene3d = new FBXHandScene(container, {
+            modelUrl: "./models/Hand/Rigged Hand.fbx",
+            width: 400,
+            height: 300,
+            cameraZ: 3,
+            modelScale: 0.015
+          });
+          scene3d.onLoaded(() => {
+            statusEl.textContent = "Modelo cargado - Activo";
+            console.log("Huesos encontrados:", scene3d.getBoneNames());
+          });
         }
 
         if (!overlay) {
