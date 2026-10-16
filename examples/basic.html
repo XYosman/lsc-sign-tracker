@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LSC Sign Tracker - Demo</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      background: #0f0f1a;
+      color: #e0e0e0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100vh;
+      padding: 20px;
+    }
+    h1 { margin-bottom: 16px; font-size: 1.5rem; }
+    .container {
+      display: flex;
+      gap: 20px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+    .panel {
+      background: #1a1a2e;
+      border-radius: 12px;
+      padding: 16px;
+      border: 1px solid #2a2a4a;
+    }
+    #video {
+      width: 320px;
+      height: 240px;
+      border-radius: 8px;
+      transform: scaleX(-1);
+      background: #000;
+    }
+    #canvas-container {
+      width: 320px;
+      height: 240px;
+      border-radius: 8px;
+      overflow: hidden;
+      position: relative;
+    }
+    .controls {
+      margin-top: 16px;
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+    button {
+      background: #4fc3f7;
+      color: #0f0f1a;
+      border: none;
+      padding: 8px 16px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 0.9rem;
+    }
+    button:hover { background: #81d4fa; }
+    button.secondary {
+      background: #2a2a4a;
+      color: #e0e0e0;
+    }
+    button.secondary:hover { background: #3a3a5a; }
+    #sign-label {
+      margin-top: 12px;
+      padding: 12px;
+      background: #16213e;
+      border-radius: 8px;
+      min-height: 48px;
+      font-size: 1.1rem;
+      text-align: center;
+      border: 1px solid #0f3460;
+    }
+    #sign-name {
+      color: #4fc3f7;
+      font-weight: 700;
+    }
+    .sign-list {
+      max-height: 300px;
+      overflow-y: auto;
+      margin-top: 12px;
+    }
+    .sign-item {
+      padding: 6px 10px;
+      margin: 4px 0;
+      background: #16213e;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.9rem;
+      border: 1px solid transparent;
+    }
+    .sign-item:hover { border-color: #4fc3f7; }
+    .status {
+      font-size: 0.8rem;
+      color: #888;
+      margin-top: 8px;
+    }
+  </style>
+</head>
+<body>
+  <h1>LSC Sign Tracker</h1>
+
+  <div class="container">
+    <div class="panel">
+      <video id="video" autoplay playsinline muted></video>
+      <div class="controls">
+        <button id="btn-start">Iniciar Cámara</button>
+        <button id="btn-stop" class="secondary">Detener</button>
+      </div>
+      <div class="status" id="status">Presiona "Iniciar Cámara" para comenzar</div>
+    </div>
+
+    <div class="panel">
+      <div id="canvas-container"></div>
+      <div id="sign-label">Se detectará la señal aquí</div>
+    </div>
+
+    <div class="panel">
+      <strong>Señas disponibles:</strong>
+      <div class="sign-list" id="sign-list"></div>
+    </div>
+  </div>
+
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "../node_modules/three/build/three.module.js"
+    }
+  }
+  </script>
+
+  <script type="module">
+    import { LSCCamera, HandScene, LSCSignLibrary, SignPlayer, LSC_SIGNS } from "../dist/index.js";
+
+    const video = document.getElementById("video");
+    const container = document.getElementById("canvas-container");
+    const statusEl = document.getElementById("status");
+    const signLabel = document.getElementById("sign-label");
+    const signList = document.getElementById("sign-list");
+    const btnStart = document.getElementById("btn-start");
+    const btnStop = document.getElementById("btn-stop");
+
+    let camera = null;
+    let scene3d = null;
+    let animFrameId = null;
+
+    const library = new LSCSignLibrary();
+    const player = new SignPlayer();
+
+    for (const sign of LSC_SIGNS) {
+      library.registerSign(sign);
+    }
+
+    for (const sign of LSC_SIGNS) {
+      const item = document.createElement("div");
+      item.className = "sign-item";
+      item.textContent = `${sign.name} (${sign.category})`;
+      item.onclick = () => playSign(sign);
+      signList.appendChild(item);
+    }
+
+    player.onFrame((left, right) => {
+      if (scene3d && left && right) {
+        scene3d.updateHands([left, right]);
+        scene3d.render();
+      } else if (scene3d && left) {
+        scene3d.updateHands([left]);
+        scene3d.render();
+      } else if (scene3d && right) {
+        scene3d.updateHands([right]);
+        scene3d.render();
+      }
+    });
+
+    function playSign(sign) {
+      signLabel.innerHTML = `Reproduciendo: <span id="sign-name">${sign.name}</span>`;
+      player.play(sign, true);
+    }
+
+    btnStart.onclick = async () => {
+      try {
+        statusEl.textContent = "Cargando modelo...";
+        camera = new LSCCamera("hands+face+pose");
+        await camera.initialize();
+
+        statusEl.textContent = "Iniciando cámara...";
+        const videoEl = await camera.startCamera();
+        video.srcObject = videoEl.srcObject;
+        video.play();
+
+        if (!scene3d) {
+          scene3d = new HandScene(container);
+        }
+
+        camera.onResult((result) => {
+          scene3d.updateHands(result.hands);
+          scene3d.render();
+
+          const match = library.matchGesture(result.hands[0] || null, result.hands[1] || null);
+          if (match && match.confidence > 0.7) {
+            signLabel.innerHTML = `Detectado: <span id="sign-name">${match.sign.name}</span> (${Math.round(match.confidence * 100)}%)`;
+          }
+        });
+
+        camera.start();
+        statusEl.textContent = "Activo - Muestra tus manos a la cámara";
+      } catch (err) {
+        statusEl.textContent = `Error: ${err.message}`;
+        console.error(err);
+      }
+    };
+
+    btnStop.onclick = () => {
+      if (camera) {
+        camera.stop();
+        camera.dispose();
+        camera = null;
+      }
+      player.stop();
+      statusEl.textContent = "Detenido";
+    };
+  </script>
+</body>
+</html>
