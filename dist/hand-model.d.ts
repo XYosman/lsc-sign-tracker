@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import type { Landmark } from "./camera";
+import type { Landmark } from "./camera.js";
 export declare class HandModel3D {
     group: THREE.Group;
     private bones;

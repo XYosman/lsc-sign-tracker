@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import type { Landmark } from "./camera";
+import type { Landmark } from "./camera.js";
 
 const HAND_CONNECTIONS: [number, number][] = [
   [0, 1], [1, 2], [2, 3], [3, 4],

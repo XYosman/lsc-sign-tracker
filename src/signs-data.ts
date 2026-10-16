@@ -1,5 +1,5 @@
-import type { Landmark } from "./camera";
-import type { SignData } from "./signs";
+import type { Landmark } from "./camera.js";
+import type { SignData } from "./signs.js";
 
 type HandShape = "fist" | "open" | "point" | "pinch" | "cShape" | "flat";
 

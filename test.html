@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LSC Sign Tracker - Prueba</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      background: #0f0f1a;
+      color: #e0e0e0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 20px;
+    }
+    h1 { margin-bottom: 8px; font-size: 1.4rem; }
+    .subtitle { color: #888; margin-bottom: 20px; font-size: 0.9rem; }
+    .container {
+      display: flex;
+      gap: 16px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+    .panel {
+      background: #1a1a2e;
+      border-radius: 12px;
+      padding: 12px;
+      border: 1px solid #2a2a4a;
+    }
+    .panel h3 {
+      font-size: 0.85rem;
+      color: #4fc3f7;
+      margin-bottom: 8px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    #video {
+      width: 400px;
+      height: 300px;
+      border-radius: 8px;
+      transform: scaleX(-1);
+      background: #000;
+    }
+    #canvas-container {
+      width: 400px;
+      height: 300px;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    .controls {
+      margin-top: 16px;
+      display: flex;
+      gap: 10px;
+    }
+    button {
+      background: #4fc3f7;
+      color: #0f0f1a;
+      border: none;
+      padding: 10px 24px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: 700;
+      font-size: 1rem;
+      transition: background 0.2s;
+    }
+    button:hover { background: #81d4fa; }
+    button.stop {
+      background: #2a2a4a;
+      color: #e0e0e0;
+    }
+    button.stop:hover { background: #3a3a5a; }
+    .result {
+      margin-top: 16px;
+      padding: 16px 24px;
+      background: #16213e;
+      border-radius: 10px;
+      min-width: 300px;
+      text-align: center;
+      font-size: 1.2rem;
+      border: 1px solid #0f3460;
+    }
+    .result .label {
+      color: #4fc3f7;
+      font-weight: 700;
+      font-size: 1.4rem;
+    }
+    .result .confidence {
+      color: #888;
+      font-size: 0.9rem;
+      margin-top: 4px;
+    }
+    .signs-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      max-width: 500px;
+      margin-top: 8px;
+    }
+    .sign-btn {
+      background: #16213e;
+      border: 1px solid #0f3460;
+      color: #e0e0e0;
+      padding: 8px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.8rem;
+      font-weight: 400;
+      text-align: center;
+    }
+    .sign-btn:hover {
+      border-color: #4fc3f7;
+      background: #1a2a4a;
+    }
+    .status {
+      margin-top: 12px;
+      font-size: 0.85rem;
+      color: #888;
+    }
+    .hand-indicator {
+      display: flex;
+      gap: 16px;
+      margin-top: 8px;
+      justify-content: center;
+      font-size: 0.85rem;
+    }
+    .hand-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      display: inline-block;
+      margin-right: 4px;
+      vertical-align: middle;
+    }
+    .hand-dot.active { background: #4caf50; }
+    .hand-dot.inactive { background: #555; }
+  </style>
+</head>
+<body>
+  <h1>Prueba LSC Sign Tracker</h1>
+  <p class="subtitle">Muestra tus manos a la cámara y reproduce señas</p>
+
+  <div class="container">
+    <div class="panel">
+      <h3>Camara</h3>
+      <video id="video" autoplay playsinline muted></video>
+      <div class="controls">
+        <button id="btn-start">Iniciar</button>
+        <button id="btn-stop" class="stop">Detener</button>
+      </div>
+      <div class="status" id="status">Listo para iniciar</div>
+      <div class="hand-indicator">
+        <span><span class="hand-dot inactive" id="dot-left"></span>Izquierda</span>
+        <span><span class="hand-dot inactive" id="dot-right"></span>Derecha</span>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h3>Modelo 3D</h3>
+      <div id="canvas-container"></div>
+    </div>
+  </div>
+
+  <div class="result" id="result">
+    Presiona Iniciar y muestra tus manos
+  </div>
+
+  <div class="panel" style="margin-top: 20px; max-width: 600px; width: 100%;">
+    <h3>Reproducir senas</h3>
+    <div class="signs-grid" id="signs-grid"></div>
+  </div>
+
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "./node_modules/three/build/three.module.js"
+    }
+  }
+  </script>
+
+  <script type="module">
+    import { LSCCamera, HandScene, LSCSignLibrary, SignPlayer, LSC_SIGNS } from "./dist/index.js";
+
+    const video = document.getElementById("video");
+    const container = document.getElementById("canvas-container");
+    const statusEl = document.getElementById("status");
+    const resultEl = document.getElementById("result");
+    const btnStart = document.getElementById("btn-start");
+    const btnStop = document.getElementById("btn-stop");
+    const dotLeft = document.getElementById("dot-left");
+    const dotRight = document.getElementById("dot-right");
+    const signsGrid = document.getElementById("signs-grid");
+
+    let camera = null;
+    let scene3d = null;
+    let library = new LSCSignLibrary();
+    let player = new SignPlayer();
+
+    for (const sign of LSC_SIGNS) {
+      library.registerSign(sign);
+
+      const btn = document.createElement("button");
+      btn.className = "sign-btn";
+      btn.textContent = sign.name;
+      btn.onclick = () => {
+        player.play(sign, true);
+        resultEl.innerHTML = `
+          <div class="label">${sign.name}</div>
+          <div class="confidence">${sign.description}</div>
+        `;
+      };
+      signsGrid.appendChild(btn);
+    }
+
+    player.onFrame((left, right) => {
+      if (!scene3d) return;
+      if (left && right) {
+        scene3d.updateHands([left, right]);
+      } else if (left) {
+        scene3d.updateHands([left]);
+      } else if (right) {
+        scene3d.updateHands([right]);
+      }
+      scene3d.render();
+    });
+
+    btnStart.onclick = async () => {
+      try {
+        statusEl.textContent = "Cargando modelo...";
+        btnStart.disabled = true;
+
+        camera = new LSCCamera("hands+face+pose");
+        await camera.initialize();
+
+        statusEl.textContent = "Activando camara...";
+        const videoEl = await camera.startCamera();
+        video.srcObject = videoEl.srcObject;
+        await video.play();
+
+        if (!scene3d) {
+          scene3d = new HandScene(container);
+        }
+
+        camera.onResult((result) => {
+          if (scene3d) {
+            scene3d.updateHands(result.hands);
+            scene3d.render();
+          }
+
+          dotLeft.className = "hand-dot " + (result.hands[0] ? "active" : "inactive");
+          dotRight.className = "hand-dot " + (result.hands[1] ? "active" : "inactive");
+
+          if (result.hands.length > 0) {
+            const match = library.matchGesture(result.hands[0] || null, result.hands[1] || null);
+            if (match && match.confidence > 0.6) {
+              resultEl.innerHTML = `
+                <div class="label">${match.sign.name}</div>
+                <div class="confidence">Confianza: ${Math.round(match.confidence * 100)}%</div>
+              `;
+            }
+          }
+        });
+
+        camera.start();
+        statusEl.textContent = "Activo";
+      } catch (err) {
+        statusEl.textContent = "Error: " + err.message;
+        console.error(err);
+      } finally {
+        btnStart.disabled = false;
+      }
+    };
+
+    btnStop.onclick = () => {
+      if (camera) {
+        camera.stop();
+        camera.dispose();
+        camera = null;
+      }
+      player.stop();
+      dotLeft.className = "hand-dot inactive";
+      dotRight.className = "hand-dot inactive";
+      statusEl.textContent = "Detenido";
+      resultEl.textContent = "Presiona Iniciar y muestra tus manos";
+    };
+  </script>
+</body>
+</html>

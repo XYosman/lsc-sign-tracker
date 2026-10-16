@@ -1,4 +1,4 @@
-import type { Landmark } from "./camera";
+import type { Landmark } from "./camera.js";
 export interface SignData {
     id: string;
     name: string;
