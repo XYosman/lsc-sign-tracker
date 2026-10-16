@@ -12,11 +12,19 @@ export interface FBXHandOptions {
 }
 
 const FINGER_BONE_MAP: Record<string, string[]> = {
-  thumb: ["Thumb1", "Thumb2", "Thumb3"],
-  index: ["Index1", "Index2", "Index3"],
-  middle: ["Middle1", "Middle2", "Middle3"],
-  ring: ["Ring1", "Ring2", "Ring3"],
-  pinky: ["Pinky1", "Pinky2", "Pinky3"]
+  thumb: ["thumb01L", "thumb02L", "thumb03L"],
+  index: ["finger_index01L", "finger_index02L", "finger_index03L"],
+  middle: ["finger_middle01L", "finger_middle02L", "finger_middle03L"],
+  ring: ["finger_ring01L", "finger_ring02L", "finger_ring03L"],
+  pinky: ["finger_pinky01L", "finger_pinky02L", "finger_pinky03L"]
+};
+
+const FINGER_BONE_MAP_R: Record<string, string[]> = {
+  thumb: ["thumb01R", "thumb02R", "thumb03R"],
+  index: ["finger_index01R", "finger_index02R", "finger_index03R"],
+  middle: ["finger_middle01R", "finger_middle02R", "finger_middle03R"],
+  ring: ["finger_ring01R", "finger_ring02R", "finger_ring03R"],
+  pinky: ["finger_pinky01R", "finger_pinky02R", "finger_pinky03R"]
 };
 
 const FINGER_LANDMARKS: Record<string, [number, number, number, number]> = {
@@ -130,30 +138,36 @@ export class FBXHandScene {
   updateHands(hands: Landmark[][]): void {
     if (!this.loaded || hands.length === 0) return;
 
-    const hand = hands[0];
-    if (hand.length < 21) return;
+    const boneMaps = [FINGER_BONE_MAP, FINGER_BONE_MAP_R];
 
-    for (const [finger, boneNames] of Object.entries(FINGER_BONE_MAP)) {
-      const [j0, j1, j2, j3] = FINGER_LANDMARKS[finger];
-      const points = [j0, j1, j2, j3].map(i => new THREE.Vector3(
-        (hand[i].x - 0.5) * 2,
-        -(hand[i].y - 0.5) * 2,
-        -hand[i].z * 2
-      ));
+    for (let h = 0; h < Math.min(hands.length, 2); h++) {
+      const hand = hands[h];
+      if (hand.length < 21) continue;
 
-      for (let b = 0; b < boneNames.length && b < points.length - 1; b++) {
-        const bone = this.boneMap.get(boneNames[b]);
-        if (!bone) continue;
+      const boneMap = boneMaps[h];
 
-        const target = points[b + 1].clone().sub(points[b]).normalize();
-        const parentWorld = new THREE.Quaternion();
-        bone.parent?.getWorldQuaternion(parentWorld);
+      for (const [finger, boneNames] of Object.entries(boneMap)) {
+        const [j0, j1, j2, j3] = FINGER_LANDMARKS[finger];
+        const points = [j0, j1, j2, j3].map(i => new THREE.Vector3(
+          (hand[i].x - 0.5) * 2,
+          -(hand[i].y - 0.5) * 2,
+          -hand[i].z * 2
+        ));
 
-        const localDir = target.clone().applyQuaternion(parentWorld.invert());
-        const restDir = new THREE.Vector3(0, 1, 0);
-        const q = new THREE.Quaternion().setFromUnitVectors(restDir, localDir);
+        for (let b = 0; b < boneNames.length && b < points.length - 1; b++) {
+          const bone = this.boneMap.get(boneNames[b]);
+          if (!bone) continue;
 
-        bone.quaternion.slerp(q, 0.6);
+          const target = points[b + 1].clone().sub(points[b]).normalize();
+          const parentWorld = new THREE.Quaternion();
+          bone.parent?.getWorldQuaternion(parentWorld);
+
+          const localDir = target.clone().applyQuaternion(parentWorld.invert());
+          const restDir = new THREE.Vector3(0, 1, 0);
+          const q = new THREE.Quaternion().setFromUnitVectors(restDir, localDir);
+
+          bone.quaternion.slerp(q, 0.6);
+        }
       }
     }
   }
