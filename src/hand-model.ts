@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import type { Landmark } from "./camera.js";
 
-const HAND_CONNECTIONS: [number, number][] = [
+export const HAND_CONNECTIONS: [number, number][] = [
   [0, 1], [1, 2], [2, 3], [3, 4],
   [0, 5], [5, 6], [6, 7], [7, 8],
   [0, 9], [9, 10], [10, 11], [11, 12],
@@ -12,6 +12,14 @@ const HAND_CONNECTIONS: [number, number][] = [
 
 const BONE_RADIUS = 0.008;
 const JOINT_RADIUS = 0.012;
+
+export interface HandSceneOptions {
+  width?: number;
+  height?: number;
+  background?: number;
+  cameraZ?: number;
+  clip?: boolean;
+}
 
 export class HandModel3D {
   group: THREE.Group;
@@ -81,17 +89,38 @@ export class HandScene {
   renderer: THREE.WebGLRenderer;
   leftHand: HandModel3D;
   rightHand: HandModel3D;
+  private container: HTMLElement;
+  private opts: Required<HandSceneOptions>;
 
-  constructor(container: HTMLElement) {
+  constructor(container: HTMLElement, options: HandSceneOptions = {}) {
+    this.container = container;
+    this.opts = {
+      width: options.width ?? container.clientWidth ?? 400,
+      height: options.height ?? container.clientHeight ?? 300,
+      background: options.background ?? 0x1a1a2e,
+      cameraZ: options.cameraZ ?? 1.2,
+      clip: options.clip ?? true
+    };
+
+    container.style.overflow = "hidden";
+    container.style.width = this.opts.width + "px";
+    container.style.height = this.opts.height + "px";
+
     this.scene = new THREE.Scene();
-    this.scene.background = new THREE.Color(0x1a1a2e);
+    this.scene.background = new THREE.Color(this.opts.background);
 
-    this.camera = new THREE.PerspectiveCamera(50, container.clientWidth / container.clientHeight, 0.01, 10);
-    this.camera.position.set(0, 0, 0.5);
+    this.camera = new THREE.PerspectiveCamera(
+      50,
+      this.opts.width / this.opts.height,
+      0.01,
+      10
+    );
+    this.camera.position.set(0, 0, this.opts.cameraZ);
 
-    this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-    this.renderer.setSize(container.clientWidth, container.clientHeight);
+    this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+    this.renderer.setSize(this.opts.width, this.opts.height);
     this.renderer.setPixelRatio(window.devicePixelRatio);
+    this.renderer.domElement.style.display = "block";
     container.appendChild(this.renderer.domElement);
 
     const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
@@ -108,7 +137,7 @@ export class HandScene {
     this.scene.add(this.leftHand.group);
     this.scene.add(this.rightHand.group);
 
-    window.addEventListener("resize", () => this.onResize(container));
+    window.addEventListener("resize", () => this.onResize());
   }
 
   updateHands(hands: Landmark[][]): void {
@@ -131,14 +160,109 @@ export class HandScene {
     this.renderer.render(this.scene, this.camera);
   }
 
-  private onResize(container: HTMLElement): void {
-    this.camera.aspect = container.clientWidth / container.clientHeight;
+  private onResize(): void {
+    const w = this.opts.width;
+    const h = this.opts.height;
+    this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
-    this.renderer.setSize(container.clientWidth, container.clientHeight);
+    this.renderer.setSize(w, h);
   }
 
   dispose(): void {
     this.renderer.dispose();
     this.renderer.domElement.remove();
+  }
+}
+
+export interface HandOverlayOptions {
+  lineWidth?: number;
+  jointColor?: string;
+  boneColor?: string;
+  jointRadius?: number;
+}
+
+export class HandOverlay {
+  private canvas: HTMLCanvasElement;
+  private ctx: CanvasRenderingContext2D;
+  private opts: Required<HandOverlayOptions>;
+
+  constructor(video: HTMLVideoElement, options: HandOverlayOptions = {}) {
+    this.opts = {
+      lineWidth: options.lineWidth ?? 3,
+      jointColor: options.jointColor ?? "#4fc3f7",
+      boneColor: options.boneColor ?? "#ffffff",
+      jointRadius: options.jointRadius ?? 4
+    };
+
+    this.canvas = document.createElement("canvas");
+    this.canvas.width = video.videoWidth || 640;
+    this.canvas.height = video.videoHeight || 480;
+    this.canvas.style.position = "absolute";
+    this.canvas.style.top = "0";
+    this.canvas.style.left = "0";
+    this.canvas.style.width = "100%";
+    this.canvas.style.height = "100%";
+    this.canvas.style.pointerEvents = "none";
+    this.canvas.style.transform = "scaleX(-1)";
+    this.canvas.style.zIndex = "10";
+    this.ctx = this.canvas.getContext("2d")!;
+
+    const parent = video.parentElement;
+    if (parent && getComputedStyle(parent).position === "relative") {
+      parent.appendChild(this.canvas);
+    } else if (parent) {
+      parent.style.position = "relative";
+      parent.appendChild(this.canvas);
+    } else {
+      document.body.appendChild(this.canvas);
+    }
+
+    video.addEventListener("loadedmetadata", () => {
+      this.canvas.width = video.videoWidth;
+      this.canvas.height = video.videoHeight;
+    });
+  }
+
+  draw(hands: Landmark[][]): void {
+    const { ctx, opts } = this;
+    ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+
+    for (const hand of hands) {
+      if (hand.length < 21) continue;
+
+      ctx.strokeStyle = opts.boneColor;
+      ctx.lineWidth = opts.lineWidth;
+      ctx.lineCap = "round";
+
+      for (const [start, end] of HAND_CONNECTIONS) {
+        const a = hand[start];
+        const b = hand[end];
+        ctx.beginPath();
+        ctx.moveTo(a.x * this.canvas.width, a.y * this.canvas.height);
+        ctx.lineTo(b.x * this.canvas.width, b.y * this.canvas.height);
+        ctx.stroke();
+      }
+
+      ctx.fillStyle = opts.jointColor;
+      for (const lm of hand) {
+        ctx.beginPath();
+        ctx.arc(
+          lm.x * this.canvas.width,
+          lm.y * this.canvas.height,
+          opts.jointRadius,
+          0,
+          Math.PI * 2
+        );
+        ctx.fill();
+      }
+    }
+  }
+
+  setVisible(visible: boolean): void {
+    this.canvas.style.display = visible ? "block" : "none";
+  }
+
+  dispose(): void {
+    this.canvas.remove();
   }
 }
